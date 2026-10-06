@@ -1,6 +1,8 @@
 const input = document.getElementById('q');
 const count = document.getElementById('count');
-const cells = Array.from(document.querySelectorAll('.grid a'));
+const grid = document.querySelector('.grid');
+const cells = Array.from(grid.querySelectorAll('a'));
+const viewButtons = document.querySelectorAll('.views button');
 let pending = null;
 let loading = null;
 
@@ -38,10 +40,49 @@ function apply(q) {
   count.textContent = shown + ' post' + (shown === 1 ? '' : 's');
 }
 
+// keep the query in the URL so searches can be shared and survive Back;
+// post pages read it back from sessionStorage for their "index" link
+function remember(q) {
+  const url = new URL(location.href);
+  if (q.trim()) url.searchParams.set('q', q.trim());
+  else url.searchParams.delete('q');
+  history.replaceState(null, '', url);
+  try { sessionStorage.setItem('indexSearch', url.search); } catch (e) {}
+}
+
+async function run(q) {
+  await loadIndex();
+  apply(q);
+}
+
 input.addEventListener('input', () => {
   clearTimeout(pending);
-  pending = setTimeout(async () => {
-    await loadIndex();
-    apply(input.value);
+  pending = setTimeout(() => {
+    remember(input.value);
+    run(input.value);
   }, 150);
 });
+
+// start fetching the index as soon as someone reaches for the search box
+input.addEventListener('focus', loadIndex, { once: true });
+
+const initial = new URLSearchParams(location.search).get('q');
+if (initial) {
+  input.value = initial;
+  remember(initial);
+  run(initial);
+} else {
+  remember('');
+}
+
+function setView(view) {
+  grid.classList.toggle('list', view === 'list');
+  viewButtons.forEach(b => b.setAttribute('aria-pressed', String(b.dataset.view === view)));
+}
+
+viewButtons.forEach(b => b.addEventListener('click', () => {
+  setView(b.dataset.view);
+  try { localStorage.setItem('view', b.dataset.view); } catch (e) {}
+}));
+
+try { setView(localStorage.getItem('view') || 'grid'); } catch (e) {}
